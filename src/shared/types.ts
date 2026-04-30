@@ -1,6 +1,6 @@
 export type Sentiment = "positive" | "neutral" | "negative" | "mixed";
 export type Urgency = "low" | "medium" | "high" | "critical";
-export type ReplyStatus = "draft" | "needs_review" | "approved" | "rejected";
+export type ReplyStatus = "draft" | "needs_review" | "approved";
 export type ReplyFilter = "all" | "unreplied" | "generating" | "pending_review" | "approved";
 export type BusyOperation = "import" | "analyze" | "reply";
 

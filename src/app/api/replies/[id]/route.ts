@@ -4,7 +4,7 @@ import { updateReplyDraft } from "@/server/replies/reply-service";
 
 const updateSchema = z.object({
   editedText: z.string().optional(),
-  status: z.enum(["draft", "needs_review", "approved", "rejected"]).optional()
+  status: z.enum(["draft", "needs_review", "approved"]).optional()
 });
 
 type RouteContext = {

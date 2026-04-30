@@ -61,8 +61,7 @@ const urgencyLabels = {
 const replyStatusLabels = {
   draft: "草稿",
   needs_review: "需审核",
-  approved: "已批准",
-  rejected: "已驳回"
+  approved: "已提交"
 } as const;
 
 const riskFlagLabels: Record<string, string> = {
@@ -394,7 +393,7 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
                 onClick={() => setReviewPoolTab("approved")}
                 type="button"
               >
-                已批准（{reviewPoolCounts.approved}）
+                已提交（{reviewPoolCounts.approved}）
               </button>
             </div>
             <ReviewList
@@ -423,10 +422,9 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
             selectedCount={selected.length}
             replyStudioTab={replyStudioTab}
             onReplyStudioTabChange={setReplyStudioTab}
-            onAction={(type, replyId) => {
-              if (type === "approved") setOperationNotice("回复已批准。");
-              else if (type === "rejected") setOperationNotice("回复已驳回。");
-              updateReply(replyId, { status: type });
+            onAction={(_type, replyId) => {
+              setOperationNotice("回复已提交。");
+              updateReply(replyId, { status: "approved" });
             }}
           />
         )}
@@ -462,7 +460,7 @@ function Dashboard({
         <Metric label="评论总量" value={metrics.total} />
         <Metric label="已分析" value={metrics.analyzed} />
         <Metric label="高优先级" value={metrics.urgent} />
-        <Metric label="已批准回复" value={metrics.approved} />
+        <Metric label="已提交回复" value={metrics.approved} />
       </div>
       <div className="dashboard-grid">
         <div className="panel">
@@ -581,7 +579,7 @@ function ReviewList({
     if (generatingReviewIds.includes(reviewId)) return "生成中";
     const reply = replyMap.get(reviewId);
     if (!reply) return null;
-    if (reply.status === "approved") return "已回复";
+    if (reply.status === "approved") return "已提交";
     if (reply.status === "needs_review") return "待审核";
     return "草稿";
   }
@@ -615,7 +613,7 @@ function ReviewList({
                   </span>
                 )}
                 {replyStatusLabel && (
-                  <span className={`pill ${replyStatusLabel === "已回复" ? "sentiment-positive" : replyStatusLabel === "生成中" ? "urgency-high" : ""}`}>
+                  <span className={`pill ${replyStatusLabel === "已提交" ? "sentiment-positive" : replyStatusLabel === "生成中" ? "urgency-high" : ""}`}>
                     {replyStatusLabel}
                   </span>
                 )}
@@ -708,7 +706,7 @@ function ReplyStudio({
   replies: ReplyDraft[];
   reviews: Review[];
   onUpdate: (id: string, patch: Partial<ReplyDraft>) => void;
-  onAction: (type: "approved" | "rejected", replyId: string) => void;
+  onAction: (type: "approved", replyId: string) => void;
   onGenerate: () => void;
   busy: string | null;
   generatingCount: number;
@@ -729,7 +727,7 @@ function ReplyStudio({
           </button>
           <a className="primary-button" href="/api/export/replies">
             <Download size={16} />
-            导出已批准
+            导出已提交
           </a>
         </div>
       </div>
@@ -746,7 +744,7 @@ function ReplyStudio({
           onClick={() => onReplyStudioTabChange("approved")}
           type="button"
         >
-          已批准（{replies.filter((r) => r.status === "approved").length}）
+          已提交（{replies.filter((r) => r.status === "approved").length}）
         </button>
       </div>
       <div className="generation-summary">
@@ -801,12 +799,11 @@ function ReplyStudio({
               />
               <p>{reply.reasoningSummary}</p>
               <div className="toolbar">
-                <button
-                  className="primary-button"
+                <button className="primary-button"
                   onClick={() => {
                 if (reply.riskFlags.length > 0) {
                   const msg =
-                    `该回复包含风险：${reply.riskFlags.join("、")}，确定要批准吗？`;
+                    `该回复包含风险：${reply.riskFlags.join("、")}，确定要提交吗？`;
                   if (!window.confirm(msg)) return;
                 }
                 onAction("approved", reply.id);
@@ -814,10 +811,7 @@ function ReplyStudio({
                   type="button"
                 >
                   <Check size={16} />
-                  批准
-                </button>
-                <button className="secondary-button" onClick={() => onAction("rejected", reply.id)} type="button">
-                  驳回
+                  提交
                 </button>
               </div>
             </article>
