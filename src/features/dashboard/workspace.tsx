@@ -87,6 +87,12 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
   const [query, setQuery] = useState("");
   const [sentiment, setSentiment] = useState<"all" | Sentiment>("all");
   const [reviewPoolTab, setReviewPoolTab] = useState<"pending" | "approved">("pending");
+
+  const reviewPoolCounts = useMemo(() => {
+    const pending = replies.filter((r) => r.status === "draft" || r.status === "needs_review").length;
+    const approved = replies.filter((r) => r.status === "approved").length;
+    return { pending, approved };
+  }, [replies]);
   const [busy, setBusy] = useState<BusyOperation | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [operationError, setOperationError] = useState("");
@@ -382,14 +388,14 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
                 onClick={() => setReviewPoolTab("pending")}
                 type="button"
               >
-                待审核（{replies.filter((r) => r.status === "draft" || r.status === "needs_review").length}）
+                待审核（{reviewPoolCounts.pending}）
               </button>
               <button
                 className={`reply-tab-button ${reviewPoolTab === "approved" ? "active" : ""}`}
                 onClick={() => setReviewPoolTab("approved")}
                 type="button"
               >
-                已批准（{replies.filter((r) => r.status === "approved").length}）
+                已批准（{reviewPoolCounts.approved}）
               </button>
             </div>
             <ReviewList
@@ -418,6 +424,11 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
             selectedCount={selected.length}
             replyStudioTab={replyStudioTab}
             onReplyStudioTabChange={setReplyStudioTab}
+            onAction={(type, replyId) => {
+              if (type === "approved") setOperationNotice("回复已批准。");
+              else if (type === "rejected") setOperationNotice("回复已驳回。");
+              updateReply(replyId, { status: type });
+            }}
           />
         )}
 
@@ -687,6 +698,7 @@ function ReplyStudio({
   replies,
   reviews,
   onUpdate,
+  onAction,
   onGenerate,
   busy,
   generatingCount,
@@ -697,6 +709,7 @@ function ReplyStudio({
   replies: ReplyDraft[];
   reviews: Review[];
   onUpdate: (id: string, patch: Partial<ReplyDraft>) => void;
+  onAction: (type: "approved" | "rejected", replyId: string) => void;
   onGenerate: () => void;
   busy: string | null;
   generatingCount: number;
@@ -792,13 +805,13 @@ function ReplyStudio({
                 <button
                   className="primary-button"
                   disabled={reply.riskFlags.length > 0 && !(reply.editedText && reply.editedText !== reply.replyText)}
-                  onClick={() => onUpdate(reply.id, { status: "approved" })}
+                  onClick={() => onAction("approved", reply.id)}
                   type="button"
                 >
                   <Check size={16} />
                   批准
                 </button>
-                <button className="secondary-button" onClick={() => onUpdate(reply.id, { status: "rejected" })} type="button">
+                <button className="secondary-button" onClick={() => onAction("rejected", reply.id)} type="button">
                   驳回
                 </button>
               </div>
