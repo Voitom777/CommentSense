@@ -86,7 +86,7 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
   const [selected, setSelected] = useState<string[]>(initialReviews.slice(0, 4).map((review) => review.id));
   const [query, setQuery] = useState("");
   const [sentiment, setSentiment] = useState<"all" | Sentiment>("all");
-  const [replyFilter, setReplyFilter] = useState<ReplyFilter>("all");
+  const [reviewPoolTab, setReviewPoolTab] = useState<"pending" | "approved">("pending");
   const [busy, setBusy] = useState<BusyOperation | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [operationError, setOperationError] = useState("");
@@ -126,16 +126,14 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(query.toLowerCase()));
       const reply = replyMap.get(review.id);
-      const matchesReplyFilter =
-        replyFilter === "all" ||
-        (replyFilter === "unreplied" && !reply) ||
-        (replyFilter === "generating" && generatingReviewIds.includes(review.id)) ||
-        (replyFilter === "pending_review" && reply && reply.status === "needs_review") ||
-        (replyFilter === "approved" && reply && reply.status === "approved");
+      const matchesTab =
+        reviewPoolTab === "pending"
+          ? !reply || reply.status === "draft" || reply.status === "needs_review"
+          : reply?.status === "approved";
 
-      return matchesSentiment && matchesQuery && matchesReplyFilter;
+      return matchesSentiment && matchesQuery && matchesTab;
     });
-  }, [analysisByReview, query, reviews, sentiment, replies, replyFilter, generatingReviewIds]);
+  }, [analysisByReview, query, reviews, sentiment, replies, reviewPoolTab, generatingReviewIds]);
 
   const metrics = useMemo(() => {
     const negative = analyses.filter((analysis) => analysis.sentiment === "negative").length;
@@ -377,17 +375,22 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
                 <option value="negative">负向</option>
                 <option value="mixed">混合</option>
               </select>
-              <select
-                className="select-input"
-                value={replyFilter}
-                onChange={(event) => setReplyFilter(event.target.value as ReplyFilter)}
+            </div>
+            <div className="reply-tabs">
+              <button
+                className={`reply-tab-button ${reviewPoolTab === "pending" ? "active" : ""}`}
+                onClick={() => setReviewPoolTab("pending")}
+                type="button"
               >
-                <option value="all">全部回复状态</option>
-                <option value="unreplied">未回复</option>
-                <option value="generating">生成中</option>
-                <option value="pending_review">待审核</option>
-                <option value="approved">已回复</option>
-              </select>
+                待审核（{replies.filter((r) => r.status === "draft" || r.status === "needs_review").length}）
+              </button>
+              <button
+                className={`reply-tab-button ${reviewPoolTab === "approved" ? "active" : ""}`}
+                onClick={() => setReviewPoolTab("approved")}
+                type="button"
+              >
+                已批准（{replies.filter((r) => r.status === "approved").length}）
+              </button>
             </div>
             <ReviewList
               reviews={filteredReviews}
@@ -853,7 +856,7 @@ function AiConfigForm({
   onAiConfigChange: (config: AiConfigStatus) => void;
 }) {
   const [baseUrl, setBaseUrl] = useState(aiConfig.baseUrl ?? "https://api.minimaxi.com/v1");
-  const [model, setModel] = useState(aiConfig.model ?? "MiniMax-M2.7-highspeed");
+  const [model, setModel] = useState(aiConfig.model ?? "MiniMax-M2.7");
   const [apiKey, setApiKey] = useState("");
   const [message, setMessage] = useState("");
   const [testMessage, setTestMessage] = useState("");
@@ -862,7 +865,7 @@ function AiConfigForm({
 
   useEffect(() => {
     setBaseUrl(aiConfig.baseUrl ?? "https://api.minimaxi.com/v1");
-    setModel(aiConfig.model ?? "MiniMax-M2.7-highspeed");
+    setModel(aiConfig.model ?? "MiniMax-M2.7");
   }, [aiConfig.baseUrl, aiConfig.model, aiConfig.hasApiKey]);
 
   async function saveConfig(clearApiKey = false) {
@@ -928,7 +931,7 @@ function AiConfigForm({
           <input
             className="search-input"
             onChange={(event) => setModel(event.target.value)}
-            placeholder="MiniMax-M2.7-highspeed"
+            placeholder="MiniMax-M2.7"
             value={model}
           />
         </label>
