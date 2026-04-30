@@ -21,7 +21,6 @@ import type {
   BusyOperation,
   ImportResult,
   ReplyDraft,
-  ReplyFilter,
   Review,
   Sentiment
 } from "@/shared/types";
@@ -804,8 +803,14 @@ function ReplyStudio({
               <div className="toolbar">
                 <button
                   className="primary-button"
-                  disabled={reply.riskFlags.length > 0 && !(reply.editedText && reply.editedText !== reply.replyText)}
-                  onClick={() => onAction("approved", reply.id)}
+                  onClick={() => {
+                if (reply.riskFlags.length > 0) {
+                  const msg =
+                    `该回复包含风险：${reply.riskFlags.join("、")}，确定要批准吗？`;
+                  if (!window.confirm(msg)) return;
+                }
+                onAction("approved", reply.id);
+              }}
                   type="button"
                 >
                   <Check size={16} />
