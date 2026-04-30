@@ -3,7 +3,7 @@ import type { AiConfigStatus } from "@/shared/types";
 import { prisma } from "@/server/db/client";
 
 const runtimeConfigSchema = z.object({
-  baseUrl: z.string().url().optional().or(z.literal("")),
+  baseUrl: z.string().regex(/^https?:\/\/.+/).optional().or(z.literal("")),
   model: z.string().trim().optional(),
   apiKey: z.string().trim().optional(),
   clearApiKey: z.boolean().optional()
