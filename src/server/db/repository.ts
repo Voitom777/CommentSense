@@ -103,21 +103,30 @@ export async function ensureDemoData() {
 }
 
 export async function getWorkspaceData() {
-  await ensureDemoData();
+  try {
+    await ensureDemoData();
 
-  const [reviews, analyses, replies, brand] = await Promise.all([
-    prisma.review.findMany({ orderBy: { importedAt: "desc" } }),
-    prisma.analysisResult.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.replyDraft.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.brandProfile.findFirst()
-  ]);
+    const [reviews, analyses, replies, brand] = await Promise.all([
+      prisma.review.findMany({ orderBy: { importedAt: "desc" } }),
+      prisma.analysisResult.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.replyDraft.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.brandProfile.findFirst()
+    ]);
 
-  return {
-    reviews: reviews.map(mapReview),
-    analyses: analyses.map(mapAnalysis),
-    replies: replies.map(mapReply),
-    brand: brand ? mapBrand(brand) : defaultBrandProfile
-  };
+    return {
+      reviews: reviews.map(mapReview),
+      analyses: analyses.map(mapAnalysis),
+      replies: replies.map(mapReply),
+      brand: brand ? mapBrand(brand) : defaultBrandProfile
+    };
+  } catch {
+    return {
+      reviews: sampleReviews,
+      analyses: sampleAnalyses,
+      replies: sampleReplies,
+      brand: defaultBrandProfile
+    };
+  }
 }
 
 export async function createImportedReviews(input: { batchId: string; fileName: string; reviews: Review[]; totalRows: number }) {
