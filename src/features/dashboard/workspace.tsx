@@ -21,6 +21,7 @@ import type {
   BusyOperation,
   ImportResult,
   ReplyDraft,
+  ReplyFilter,
   Review,
   Sentiment
 } from "@/shared/types";
@@ -85,11 +86,15 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
   const [selected, setSelected] = useState<string[]>(initialReviews.slice(0, 4).map((review) => review.id));
   const [query, setQuery] = useState("");
   const [sentiment, setSentiment] = useState<"all" | Sentiment>("all");
+  const [replyFilter, setReplyFilter] = useState<ReplyFilter>("all");
   const [busy, setBusy] = useState<BusyOperation | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [operationError, setOperationError] = useState("");
   const [operationNotice, setOperationNotice] = useState("");
   const [generatingReplyCount, setGeneratingReplyCount] = useState(0);
+  const [generatingReviewIds, setGeneratingReviewIds] = useState<string[]>([]);
+  const [analyzingCount, setAnalyzingCount] = useState(0);
+  const [replyStudioTab, setReplyStudioTab] = useState<"pending" | "approved">("pending");
   const [aiConfig, setAiConfig] = useState<AiConfigStatus>({
     mode: "mock",
     hasApiKey: false,
@@ -111,6 +116,7 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
   );
 
   const filteredReviews = useMemo(() => {
+    const replyMap = new Map(replies.map((r) => [r.reviewId, r]));
     return reviews.filter((review) => {
       const analysis = analysisByReview.get(review.id);
       const matchesSentiment = sentiment === "all" || analysis?.sentiment === sentiment;
@@ -119,10 +125,17 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
         [review.content, review.platform, review.productName, review.author]
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(query.toLowerCase()));
+      const reply = replyMap.get(review.id);
+      const matchesReplyFilter =
+        replyFilter === "all" ||
+        (replyFilter === "unreplied" && !reply) ||
+        (replyFilter === "generating" && generatingReviewIds.includes(review.id)) ||
+        (replyFilter === "pending_review" && reply && reply.status === "needs_review") ||
+        (replyFilter === "approved" && reply && reply.status === "approved");
 
-      return matchesSentiment && matchesQuery;
+      return matchesSentiment && matchesQuery && matchesReplyFilter;
     });
-  }, [analysisByReview, query, reviews, sentiment]);
+  }, [analysisByReview, query, reviews, sentiment, replies, replyFilter, generatingReviewIds]);
 
   const metrics = useMemo(() => {
     const negative = analyses.filter((analysis) => analysis.sentiment === "negative").length;
@@ -194,6 +207,7 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
   async function analyzeSelected() {
     if (selected.length === 0) return;
     setBusy("analyze");
+    setAnalyzingCount(selected.length);
     setOperationError("");
     setOperationNotice("");
 
@@ -205,16 +219,19 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
       });
       const payload = (await readJsonResponse(response)) as { analyses: AnalysisResult[] };
       setAnalyses((current) => mergeBy(current, payload.analyses, "reviewId"));
+      setOperationNotice(`分析完成，已分析 ${payload.analyses.length} 条评论。`);
     } catch (error) {
       setOperationError(error instanceof Error ? error.message : "分析失败，请检查模型配置。");
     } finally {
       setBusy(null);
+      setAnalyzingCount(0);
     }
   }
 
   async function generateReplies() {
     if (selected.length === 0) return;
     setBusy("reply");
+    setGeneratingReviewIds(selected);
     setGeneratingReplyCount(selected.length);
     setOperationError("");
     setOperationNotice(`${selected.length} 条评论回复生成中`);
@@ -233,6 +250,7 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
       setOperationError(error instanceof Error ? error.message : "生成回复失败，请检查模型配置。");
     } finally {
       setGeneratingReplyCount(0);
+      setGeneratingReviewIds([]);
       setBusy(null);
     }
   }
@@ -246,6 +264,7 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
       });
       const payload = (await readJsonResponse(response)) as { reply: ReplyDraft };
       setReplies((current) => mergeBy(current, [payload.reply], "id"));
+      setOperationNotice("回复已更新。");
     } catch (error) {
       setOperationError(error instanceof Error ? error.message : "更新回复失败。");
     }
@@ -358,11 +377,24 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
                 <option value="negative">负向</option>
                 <option value="mixed">混合</option>
               </select>
+              <select
+                className="select-input"
+                value={replyFilter}
+                onChange={(event) => setReplyFilter(event.target.value as ReplyFilter)}
+              >
+                <option value="all">全部回复状态</option>
+                <option value="unreplied">未回复</option>
+                <option value="generating">生成中</option>
+                <option value="pending_review">待审核</option>
+                <option value="approved">已回复</option>
+              </select>
             </div>
             <ReviewList
               reviews={filteredReviews}
               selected={selected}
               analyses={analysisByReview}
+              replies={replies}
+              generatingReviewIds={generatingReviewIds}
               onToggle={toggleSelected}
             />
           </section>
@@ -381,6 +413,8 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
             busy={busy}
             generatingCount={generatingReplyCount}
             selectedCount={selected.length}
+            replyStudioTab={replyStudioTab}
+            onReplyStudioTabChange={setReplyStudioTab}
           />
         )}
 
@@ -513,21 +547,37 @@ function ReviewList({
   reviews,
   selected,
   analyses,
+  replies,
+  generatingReviewIds,
   onToggle
 }: {
   reviews: Review[];
   selected: string[];
   analyses: Map<string, AnalysisResult>;
+  replies: ReplyDraft[];
+  generatingReviewIds: string[];
   onToggle: (id: string) => void;
 }) {
+  const replyMap = useMemo(() => new Map(replies.map((r) => [r.reviewId, r])), [replies]);
+
   if (reviews.length === 0) {
     return <div className="empty-state">没有符合筛选条件的评论</div>;
+  }
+
+  function getReplyStatusLabel(reviewId: string) {
+    if (generatingReviewIds.includes(reviewId)) return "生成中";
+    const reply = replyMap.get(reviewId);
+    if (!reply) return null;
+    if (reply.status === "approved") return "已回复";
+    if (reply.status === "needs_review") return "待审核";
+    return "草稿";
   }
 
   return (
     <div className="review-list">
       {reviews.map((review) => {
         const analysis = analyses.get(review.id);
+        const replyStatusLabel = getReplyStatusLabel(review.id);
         return (
           <article className="review-card" key={review.id}>
             <div className="card-head">
@@ -545,11 +595,18 @@ function ReviewList({
                 </div>
                 <p>{review.content}</p>
               </div>
-              {analysis && (
-                <span className={`pill sentiment-${analysis.sentiment}`}>
-                  {sentimentLabels[analysis.sentiment]} / {urgencyLabels[analysis.urgency]}
-                </span>
-              )}
+              <div className="card-head-right">
+                {analysis && (
+                  <span className={`pill sentiment-${analysis.sentiment}`}>
+                    {sentimentLabels[analysis.sentiment]} / {urgencyLabels[analysis.urgency]}
+                  </span>
+                )}
+                {replyStatusLabel && (
+                  <span className={`pill ${replyStatusLabel === "已回复" ? "sentiment-positive" : replyStatusLabel === "生成中" ? "urgency-high" : ""}`}>
+                    {replyStatusLabel}
+                  </span>
+                )}
+              </div>
             </div>
             {analysis && (
               <div className="toolbar">
@@ -630,7 +687,9 @@ function ReplyStudio({
   onGenerate,
   busy,
   generatingCount,
-  selectedCount
+  selectedCount,
+  replyStudioTab,
+  onReplyStudioTabChange
 }: {
   replies: ReplyDraft[];
   reviews: Review[];
@@ -639,6 +698,8 @@ function ReplyStudio({
   busy: string | null;
   generatingCount: number;
   selectedCount: number;
+  replyStudioTab: "pending" | "approved";
+  onReplyStudioTabChange: (tab: "pending" | "approved") => void;
 }) {
   const reviewMap = useMemo(() => new Map(reviews.map((review) => [review.id, review])), [reviews]);
 
@@ -656,6 +717,22 @@ function ReplyStudio({
             导出已批准
           </a>
         </div>
+      </div>
+      <div className="reply-tabs">
+        <button
+          className={`reply-tab-button ${replyStudioTab === "pending" ? "active" : ""}`}
+          onClick={() => onReplyStudioTabChange("pending")}
+          type="button"
+        >
+          待审核（{replies.filter((r) => r.status === "needs_review" || r.status === "draft").length}）
+        </button>
+        <button
+          className={`reply-tab-button ${replyStudioTab === "approved" ? "active" : ""}`}
+          onClick={() => onReplyStudioTabChange("approved")}
+          type="button"
+        >
+          已批准（{replies.filter((r) => r.status === "approved").length}）
+        </button>
       </div>
       <div className="generation-summary">
         <div>
@@ -678,7 +755,12 @@ function ReplyStudio({
         </div>
       </div>
       <div className="reply-list">
-        {replies.map((reply) => {
+        {replies
+          .filter((reply) => {
+            if (replyStudioTab === "pending") return reply.status === "needs_review" || reply.status === "draft";
+            return reply.status === "approved";
+          })
+          .map((reply) => {
           const review = reviewMap.get(reply.reviewId);
           return (
             <article className="reply-card" key={reply.id}>
