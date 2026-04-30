@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ImportBatch {
+  id          String   @id @default(cuid())
+  fileName    String
+  totalRows   Int
+  createdAt   DateTime @default(now())
+  reviews     Review[]
+}
+
+model Review {
+  id             String          @id @default(cuid())
+  platform       String?
+  productName    String?
+  rating         Float?
+  author         String?
+  content        String
+  createdAt      DateTime?
+  importedAt     DateTime        @default(now())
+  importBatchId  String?
+  importBatch    ImportBatch?    @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  analysisResult AnalysisResult?
+  replyDrafts    ReplyDraft[]
+}
+
+model AnalysisResult {
+  id          String    @id @default(cuid())
+  reviewId    String    @unique
+  review      Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  sentiment   String
+  topics      String
+  intent      String
+  urgency     String
+  summary     String
+  confidence  Float
+  createdAt   DateTime  @default(now())
+}
+
+model ReplyDraft {
+  id                String      @id @default(cuid())
+  reviewId           String
+  review             Review      @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  replyText          String
+  editedText         String?
+  tone               String
+  riskFlags          String
+  reasoningSummary   String
+  status             String      @default("draft")
+  generationParams   String
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+}
+
+model BrandProfile {
+  id               String   @id @default(cuid())
+  name             String
+  tone             String
+  audience         String
+  forbiddenWords   String
+  servicePolicy    String
+  replyLength      String   @default("medium")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model PromptVersion {
+  id          String   @id @default(cuid())
+  name        String
+  version     String
+  purpose     String
+  content     String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([name, version])
+}
+
+model AiConfig {
+  id        String   @id @default("default")
+  baseUrl   String?
+  model     String?
+  apiKey    String?
+  updatedAt DateTime @updatedAt
+}
