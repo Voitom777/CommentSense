@@ -852,8 +852,8 @@ function AiConfigForm({
   aiConfig: AiConfigStatus;
   onAiConfigChange: (config: AiConfigStatus) => void;
 }) {
-  const [baseUrl, setBaseUrl] = useState(aiConfig.baseUrl ?? "https://api.deepseek.com/v1");
-  const [model, setModel] = useState(aiConfig.model ?? "deepseek-chat");
+  const [baseUrl, setBaseUrl] = useState(aiConfig.baseUrl ?? "https://api.minimaxi.com/v1");
+  const [model, setModel] = useState(aiConfig.model ?? "MiniMax-M2.7-highspeed");
   const [apiKey, setApiKey] = useState("");
   const [message, setMessage] = useState("");
   const [testMessage, setTestMessage] = useState("");
@@ -861,8 +861,8 @@ function AiConfigForm({
   const [testing, setTesting] = useState(false);
 
   useEffect(() => {
-    setBaseUrl(aiConfig.baseUrl ?? "https://api.deepseek.com/v1");
-    setModel(aiConfig.model ?? "deepseek-chat");
+    setBaseUrl(aiConfig.baseUrl ?? "https://api.minimaxi.com/v1");
+    setModel(aiConfig.model ?? "MiniMax-M2.7-highspeed");
   }, [aiConfig.baseUrl, aiConfig.model, aiConfig.hasApiKey]);
 
   async function saveConfig(clearApiKey = false) {
@@ -919,7 +919,7 @@ function AiConfigForm({
           <input
             className="search-input"
             onChange={(event) => setBaseUrl(event.target.value)}
-            placeholder="https://api.deepseek.com/v1"
+            placeholder="https://api.minimaxi.com/v1"
             value={baseUrl}
           />
         </label>
@@ -928,7 +928,7 @@ function AiConfigForm({
           <input
             className="search-input"
             onChange={(event) => setModel(event.target.value)}
-            placeholder="deepseek-chat"
+            placeholder="MiniMax-M2.7-highspeed"
             value={model}
           />
         </label>
