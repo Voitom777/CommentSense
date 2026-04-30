@@ -60,22 +60,33 @@ export async function getAiConfigStatus(): Promise<AiConfigStatus> {
 
 export async function updateRuntimeAiConfig(input: unknown) {
   const parsed = runtimeConfigSchema.parse(input);
-  const existing = await prisma.aiConfig.findUnique({ where: { id: "default" } });
 
-  await prisma.aiConfig.upsert({
-    where: { id: "default" },
-    update: {
+  try {
+    const existing = await prisma.aiConfig.findUnique({ where: { id: "default" } });
+
+    await prisma.aiConfig.upsert({
+      where: { id: "default" },
+      update: {
+        baseUrl: parsed.baseUrl?.trim() || undefined,
+        model: parsed.model?.trim() || undefined,
+        apiKey: parsed.clearApiKey ? undefined : parsed.apiKey?.trim() || existing?.apiKey
+      },
+      create: {
+        id: "default",
+        baseUrl: parsed.baseUrl?.trim() || undefined,
+        model: parsed.model?.trim() || undefined,
+        apiKey: parsed.clearApiKey ? undefined : parsed.apiKey?.trim() || undefined
+      }
+    });
+  } catch {
+    return {
+      mode: "environment" as const,
       baseUrl: parsed.baseUrl?.trim() || undefined,
       model: parsed.model?.trim() || undefined,
-      apiKey: parsed.clearApiKey ? undefined : parsed.apiKey?.trim() || existing?.apiKey
-    },
-    create: {
-      id: "default",
-      baseUrl: parsed.baseUrl?.trim() || undefined,
-      model: parsed.model?.trim() || undefined,
-      apiKey: parsed.clearApiKey ? undefined : parsed.apiKey?.trim() || undefined
-    }
-  });
+      hasApiKey: Boolean(parsed.apiKey?.trim()),
+      sourceLabel: "环境变量"
+    };
+  }
 
   return getAiConfigStatus();
 }
