@@ -81,6 +81,19 @@ button {
   margin: 0 auto;
 }
 
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: #2d8a6e;
+  color: #fff;
+  font-size: 14px;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
 .topbar {
   display: grid;
   grid-template-columns: 1fr auto;

@@ -35,6 +35,7 @@ type WorkspaceProps = {
   initialAnalyses: AnalysisResult[];
   initialReplies: ReplyDraft[];
   brand: BrandProfile;
+  demoMode?: boolean;
 };
 
 type Tab = "dashboard" | "import" | "reviews" | "insights" | "replies" | "settings";
@@ -108,7 +109,7 @@ function getPetEmoji(productName: string | null | undefined): string {
   return "🐾";
 }
 
-export function Workspace({ initialReviews, initialAnalyses, initialReplies, brand }: WorkspaceProps) {
+export function Workspace({ initialReviews, initialAnalyses, initialReplies, brand, demoMode }: WorkspaceProps) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [reviews, setReviews] = useState(initialReviews);
   const [analyses, setAnalyses] = useState(initialAnalyses);
@@ -373,6 +374,13 @@ export function Workspace({ initialReviews, initialAnalyses, initialReplies, bra
             <span className="pill">审核优先</span>
           </div>
         </header>
+
+        {demoMode && (
+          <div className="demo-banner">
+            <AlertTriangle size={16} />
+            <span>演示模式 — 数据仅供浏览</span>
+          </div>
+        )}
 
         <nav className="nav-tabs" aria-label="工作台导航">
           {tabs.map((tab) => (

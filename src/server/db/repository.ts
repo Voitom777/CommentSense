@@ -128,7 +128,8 @@ export async function getWorkspaceData() {
       reviews: sampleReviews,
       analyses: sampleAnalyses,
       replies: sampleReplies,
-      brand: defaultBrandProfile
+      brand: defaultBrandProfile,
+      demoMode: true
     };
   }
 }
