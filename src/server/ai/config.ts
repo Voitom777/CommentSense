@@ -54,7 +54,7 @@ export async function getAiConfigStatus(): Promise<AiConfigStatus> {
         ? "页面配置"
         : effective.mode === "environment"
           ? "环境变量"
-          : "Mock"
+          : "模拟"
   };
 }
 

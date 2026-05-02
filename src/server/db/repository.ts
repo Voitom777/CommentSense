@@ -106,12 +106,15 @@ export async function getWorkspaceData() {
   try {
     await ensureDemoData();
 
-    const [reviews, analyses, replies, brand] = await Promise.all([
+    const [reviews, analyses, brand] = await Promise.all([
       prisma.review.findMany({ orderBy: { importedAt: "desc" } }),
       prisma.analysisResult.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.replyDraft.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.brandProfile.findFirst()
     ]);
+    // Deduplicate: keep only the latest draft per reviewId
+    const rawReplies = await prisma.replyDraft.findMany({ orderBy: { createdAt: "desc" } });
+    const latestPerReview = new Map(rawReplies.map((r) => [r.reviewId, r]));
+    const replies = [...latestPerReview.values()];
 
     return {
       reviews: reviews.map(mapReview),
@@ -186,6 +189,13 @@ export async function upsertAnalysisResult(analysis: AnalysisResult) {
   return mapAnalysis(saved);
 }
 
+export async function findReplyDraftsByReviewIds(reviewIds: string[]) {
+  const drafts = await prisma.replyDraft.findMany({
+    where: { reviewId: { in: reviewIds } }
+  });
+  return drafts.map(mapReply);
+}
+
 export async function createReplyDraft(reply: ReplyDraft) {
   const saved = await prisma.replyDraft.create({
     data: {
@@ -205,11 +215,18 @@ export async function createReplyDraft(reply: ReplyDraft) {
   return mapReply(saved);
 }
 
-export async function updateReplyDraftById(replyId: string, patch: Partial<Pick<ReplyDraft, "editedText" | "status">>) {
+export async function updateReplyDraftById(
+  replyId: string,
+  patch: Partial<Pick<ReplyDraft, "editedText" | "status" | "replyText" | "tone" | "riskFlags" | "reasoningSummary" | "generationParams" | "createdAt">>
+) {
   try {
     const saved = await prisma.replyDraft.update({
       where: { id: replyId },
-      data: patch
+      data: {
+        ...patch,
+        riskFlags: patch.riskFlags ? JSON.stringify(patch.riskFlags) : undefined,
+        generationParams: patch.generationParams ? JSON.stringify(patch.generationParams) : undefined
+      }
     });
     return mapReply(saved);
   } catch {

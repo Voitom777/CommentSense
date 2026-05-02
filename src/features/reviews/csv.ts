@@ -81,6 +81,20 @@ export function parseCsv(text: string) {
   );
 }
 
+export function detectCsvEncoding(buffer: ArrayBuffer): string {
+  // Try UTF-8 first, scan for replacement character U+FFFD
+  const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(buffer.slice(0, 4096));
+  if (utf8.includes("�")) {
+    return "gbk";
+  }
+  return "utf-8";
+}
+
+export function decodeCsvBuffer(buffer: ArrayBuffer, encoding?: string): string {
+  const enc = encoding ?? detectCsvEncoding(buffer);
+  return new TextDecoder(enc, { fatal: false }).decode(buffer);
+}
+
 export function importReviewsFromCsv(text: string, fileName = "uploaded.csv"): ImportResult {
   const records = parseCsv(text);
   const batchId = `batch_${Date.now()}`;

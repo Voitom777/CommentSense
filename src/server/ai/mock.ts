@@ -2,14 +2,10 @@ import type { BrandProfile, Review } from "@/shared/types";
 import type { StructuredAnalysis, StructuredReply } from "./schemas";
 import { detectRiskFlags } from "./risk";
 
-const negativeTerms = ["破", "漏", "吐", "不适", "差", "没敢", "问题", "短"];
-const positiveTerms = ["贴心", "方便", "正常", "爱吃", "合适", "好", "不掉"];
-
 export function mockAnalyzeReview(review: Review): StructuredAnalysis {
   const content = review.content;
+  const rating = review.rating ?? 3;
   const healthRelated = ["吐", "不适", "腹泻", "过敏"].some((term) => content.includes(term));
-  const hasNegative = negativeTerms.some((term) => content.includes(term)) || (review.rating ?? 5) <= 2;
-  const hasPositive = positiveTerms.some((term) => content.includes(term)) || (review.rating ?? 0) >= 4;
 
   const topics = new Set<string>();
   if (content.includes("包装") || content.includes("漏")) topics.add("包装/物流");
@@ -20,15 +16,15 @@ export function mockAnalyzeReview(review: Review): StructuredAnalysis {
   if (topics.size === 0) topics.add("产品体验");
 
   return {
-    sentiment: hasNegative && hasPositive ? "mixed" : hasNegative ? "negative" : hasPositive ? "positive" : "neutral",
+    sentiment: rating >= 4 ? "positive" : rating === 3 ? "neutral" : "negative",
     topics: Array.from(topics),
-    intent: healthRelated ? "咨询健康风险" : hasNegative ? "要求处理问题" : hasPositive ? "分享正向体验" : "反馈产品体验",
-    urgency: healthRelated ? "critical" : hasNegative ? "high" : "low",
+    intent: healthRelated ? "咨询健康风险" : rating <= 2 ? "要求处理问题" : rating >= 4 ? "分享正向体验" : "反馈产品体验",
+    urgency: healthRelated ? "critical" : rating <= 2 ? "high" : "low",
     summary: healthRelated
       ? "评论涉及宠物健康不适，需要谨慎回应并建议咨询兽医。"
-      : hasNegative
+      : rating <= 2
         ? "用户反馈体验问题，需要安抚并给出清晰处理路径。"
-        : hasPositive
+        : rating >= 4
           ? "用户表达认可，可感谢并强化品牌价值。"
           : "用户提出中性反馈，可回应具体体验并邀请补充信息。",
     confidence: healthRelated ? 0.94 : 0.88

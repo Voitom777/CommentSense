@@ -2,15 +2,48 @@ import { defaultBrandProfile } from "@/features/brand/default-brand";
 import type { ReplyDraft } from "@/shared/types";
 import { getAiConfigStatus } from "@/server/ai/config";
 import { generateReply } from "@/server/ai/client";
-import { createReplyDraft, findReviewsByIds, getApprovedReplies, updateReplyDraftById } from "@/server/db/repository";
+import {
+  createReplyDraft,
+  findReplyDraftsByReviewIds,
+  findReviewsByIds,
+  getApprovedReplies,
+  updateReplyDraftById
+} from "@/server/db/repository";
 
 export async function generateReplyDrafts(reviewIds: string[]) {
-  const selectedReviews = await findReviewsByIds(reviewIds);
+  const [selectedReviews, existingDrafts] = await Promise.all([
+    findReviewsByIds(reviewIds),
+    findReplyDraftsByReviewIds(reviewIds)
+  ]);
+
   const aiConfig = await getAiConfigStatus();
+  const existingByReviewId = new Map(existingDrafts.map((d) => [d.reviewId, d]));
 
   return Promise.all(
     selectedReviews.map(async (review): Promise<ReplyDraft> => {
       const result = await generateReply(review, defaultBrandProfile);
+      const now = new Date().toISOString();
+      const status: ReplyDraft["status"] = result.riskFlags.length > 0 ? "needs_review" : "draft";
+
+      const existing = existingByReviewId.get(review.id);
+      if (existing) {
+        const updated = await updateReplyDraftById(existing.id, {
+          replyText: result.replyText,
+          tone: result.tone,
+          riskFlags: result.riskFlags,
+          reasoningSummary: result.reasoningSummary,
+          status,
+          generationParams: {
+            mode: aiConfig.mode,
+            model: aiConfig.model || "Mock",
+            brand: defaultBrandProfile.name,
+            promptVersion: "reply-generation:v1"
+          },
+          createdAt: now
+        });
+        return updated ?? existing;
+      }
+
       const reply: ReplyDraft = {
         id: `reply_${review.id}_${Date.now()}`,
         reviewId: review.id,
@@ -18,14 +51,14 @@ export async function generateReplyDrafts(reviewIds: string[]) {
         tone: result.tone,
         riskFlags: result.riskFlags,
         reasoningSummary: result.reasoningSummary,
-        status: result.riskFlags.length > 0 ? "needs_review" : "draft",
+        status,
         generationParams: {
           mode: aiConfig.mode,
           model: aiConfig.model || "Mock",
           brand: defaultBrandProfile.name,
           promptVersion: "reply-generation:v1"
         },
-        createdAt: new Date().toISOString()
+        createdAt: now
       };
 
       return createReplyDraft(reply);
