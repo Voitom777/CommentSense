@@ -13,3 +13,16 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
+
+let _dbAvailable: boolean | null = null;
+
+export async function isDbAvailable(): Promise<boolean> {
+  if (_dbAvailable !== null) return _dbAvailable;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    _dbAvailable = true;
+  } catch {
+    _dbAvailable = false;
+  }
+  return _dbAvailable;
+}

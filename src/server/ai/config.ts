@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { AiConfigStatus } from "@/shared/types";
-import { prisma } from "@/server/db/client";
+import { isDbAvailable, prisma } from "@/server/db/client";
 
 const runtimeConfigSchema = z.object({
   baseUrl: z.string().regex(/^https?:\/\/.+/).optional().or(z.literal("")),
@@ -10,16 +10,22 @@ const runtimeConfigSchema = z.object({
 });
 
 export async function getEffectiveAiConfig() {
-  const saved = await prisma.aiConfig.findUnique({ where: { id: "default" } });
-  const savedReady = Boolean(saved?.baseUrl && saved.model && saved.apiKey);
+  if (await isDbAvailable()) {
+    try {
+      const saved = await prisma.aiConfig.findUnique({ where: { id: "default" } });
+      const savedReady = Boolean(saved?.baseUrl && saved.model && saved.apiKey);
 
-  if (savedReady) {
-    return {
-      mode: "runtime" as const,
-      baseUrl: saved?.baseUrl,
-      model: saved?.model,
-      apiKey: saved?.apiKey
-    };
+      if (savedReady) {
+        return {
+          mode: "runtime" as const,
+          baseUrl: saved?.baseUrl,
+          model: saved?.model,
+          apiKey: saved?.apiKey
+        };
+      }
+    } catch {
+      // DB unavailable, fall through to env/mock
+    }
   }
 
   const envReady = Boolean(process.env.AI_BASE_URL && process.env.AI_MODEL && process.env.AI_API_KEY);

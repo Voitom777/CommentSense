@@ -1,7 +1,7 @@
 import { defaultBrandProfile } from "@/features/brand/default-brand";
 import { sampleAnalyses, sampleReplies, sampleReviews } from "@/features/reviews/sample-data";
 import type { AnalysisResult, BrandProfile, ReplyDraft, Review } from "@/shared/types";
-import { prisma } from "@/server/db/client";
+import { prisma, isDbAvailable } from "@/server/db/client";
 
 type PrismaReview = Awaited<ReturnType<typeof prisma.review.findMany>>[number];
 type PrismaAnalysis = NonNullable<Awaited<ReturnType<typeof prisma.analysisResult.findFirst>>>;
@@ -9,6 +9,7 @@ type PrismaReply = Awaited<ReturnType<typeof prisma.replyDraft.findMany>>[number
 type PrismaBrand = NonNullable<Awaited<ReturnType<typeof prisma.brandProfile.findFirst>>>;
 
 export async function ensureDemoData() {
+  if (!(await isDbAvailable())) return;
   const reviewCount = await prisma.review.count();
 
   await prisma.brandProfile.upsert({
@@ -133,6 +134,9 @@ export async function getWorkspaceData() {
 }
 
 export async function createImportedReviews(input: { batchId: string; fileName: string; reviews: Review[]; totalRows: number }) {
+  if (!(await isDbAvailable())) {
+    throw new Error("演示模式不支持导入评论");
+  }
   await prisma.importBatch.create({
     data: {
       id: input.batchId,
@@ -157,6 +161,8 @@ export async function createImportedReviews(input: { batchId: string; fileName: 
 }
 
 export async function findReviewsByIds(reviewIds: string[]) {
+  if (!(await isDbAvailable())) return [];
+
   const reviews = await prisma.review.findMany({
     where: { id: { in: reviewIds } }
   });
@@ -165,6 +171,10 @@ export async function findReviewsByIds(reviewIds: string[]) {
 }
 
 export async function upsertAnalysisResult(analysis: AnalysisResult) {
+  if (!(await isDbAvailable())) {
+    throw new Error("演示模式不支持分析评论");
+  }
+
   const saved = await prisma.analysisResult.upsert({
     where: { reviewId: analysis.reviewId },
     update: {
@@ -190,6 +200,8 @@ export async function upsertAnalysisResult(analysis: AnalysisResult) {
 }
 
 export async function findReplyDraftsByReviewIds(reviewIds: string[]) {
+  if (!(await isDbAvailable())) return [];
+
   const drafts = await prisma.replyDraft.findMany({
     where: { reviewId: { in: reviewIds } }
   });
@@ -197,6 +209,10 @@ export async function findReplyDraftsByReviewIds(reviewIds: string[]) {
 }
 
 export async function createReplyDraft(reply: ReplyDraft) {
+  if (!(await isDbAvailable())) {
+    throw new Error("演示模式不支持生成回复");
+  }
+
   const saved = await prisma.replyDraft.create({
     data: {
       id: reply.id,
@@ -235,6 +251,8 @@ export async function updateReplyDraftById(
 }
 
 export async function getApprovedReplies() {
+  if (!(await isDbAvailable())) return [];
+
   const replies = await prisma.replyDraft.findMany({
     where: { status: "approved" },
     orderBy: { updatedAt: "desc" }
