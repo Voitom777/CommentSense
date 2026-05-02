@@ -10,9 +10,11 @@ const runtimeConfigSchema = z.object({
 });
 
 export async function getEffectiveAiConfig() {
+  let saved: { baseUrl: string | null; model: string | null; apiKey: string | null } | null = null;
+
   if (await isDbAvailable()) {
     try {
-      const saved = await prisma.aiConfig.findUnique({ where: { id: "default" } });
+      saved = await prisma.aiConfig.findUnique({ where: { id: "default" } });
       const savedReady = Boolean(saved?.baseUrl && saved.model && saved.apiKey);
 
       if (savedReady) {
